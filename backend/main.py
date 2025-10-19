@@ -79,24 +79,62 @@ def fetch_chess_com_games(username: str):
     now = datetime.datetime.now()
     year = now.year
     month = now.strftime("%m")
-    
     url = f"https://api.chess.com/pub/player/{username}/games/{year}/{month}"
-    
+
+    # Chess.com requires a User-Agent header; provide a descriptive one.
+    headers = {
+        "User-Agent": "chess-eval-2 (https://github.com/Reivaxmar/chess-eval-2)"
+    }
+
+    # Simple retry/backoff for transient 429/403 responses
+    import time
+
+    def _get_with_retries(target_url: str):
+        retries = 3
+        backoff = 1.0
+        for attempt in range(1, retries + 1):
+            try:
+                resp = requests.get(target_url, headers=headers, timeout=10)
+                # If chess.com returns 403, treat it specially
+                if resp.status_code == 403:
+                    # Forbidden - often due to blocked client or missing UA
+                    raise requests.exceptions.HTTPError(f"403 Forbidden for url: {target_url}")
+                if resp.status_code == 429:
+                    # Rate limited - wait and retry
+                    if attempt < retries:
+                        time.sleep(backoff)
+                        backoff *= 2
+                        continue
+                    else:
+                        resp.raise_for_status()
+                resp.raise_for_status()
+                return resp
+            except requests.exceptions.RequestException as e:
+                # On last attempt, re-raise
+                if attempt == retries:
+                    raise
+                time.sleep(backoff)
+                backoff *= 2
+
     try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
+        response = _get_with_retries(url)
         data = response.json()
-        
+
         if "games" not in data or len(data["games"]) == 0:
             # Try previous month
             prev_month = now.month - 1 if now.month > 1 else 12
             prev_year = year if now.month > 1 else year - 1
             url = f"https://api.chess.com/pub/player/{username}/games/{prev_year}/{prev_month:02d}"
-            response = requests.get(url, timeout=10)
-            response.raise_for_status()
+            response = _get_with_retries(url)
             data = response.json()
-        
+
         return data.get("games", [])
+    except requests.exceptions.HTTPError as e:
+        # Map HTTPError to clearer client errors
+        msg = str(e)
+        if "403" in msg:
+            raise HTTPException(status_code=403, detail=f"Access forbidden when fetching games for '{username}': {msg}")
+        raise HTTPException(status_code=400, detail=f"Failed to fetch games: {msg}")
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch games: {str(e)}")
 
