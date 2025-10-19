@@ -17,6 +17,8 @@ interface ChessBoardProps {
 
 export default function ChessBoard({ position, currentMove, onPositionChange }: ChessBoardProps) {
   const chessRef = useRef(new Chess());
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [boardWidth, setBoardWidth] = useState<number>(0);
 
   // keep internal chess.js instance in sync when parent position changes
   useEffect(() => {
@@ -28,6 +30,18 @@ export default function ChessBoard({ position, currentMove, onPositionChange }: 
       chessRef.current = new Chess();
     }
   }, [position]);
+
+  // Measure board width to compute square coordinates for overlays
+  useEffect(() => {
+    function measure() {
+      if (containerRef.current) {
+        setBoardWidth(containerRef.current.clientWidth);
+      }
+    }
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
   // Get the square to highlight with overlay
   const customSquareStyles = useMemo(() => {
     if (!currentMove) return {};
@@ -40,7 +54,7 @@ export default function ChessBoard({ position, currentMove, onPositionChange }: 
         overlayColor = 'rgba(34, 197, 94, 0.4)'; // green
         break;
       case 'Good':
-        overlayColor = 'rgba(59, 130, 246, 0.4)'; // blue
+        overlayColor = 'rgba(94, 129, 87, 0.45)'; // greyish-green
         break;
       case 'Inaccuracy':
         overlayColor = 'rgba(234, 179, 8, 0.5)'; // yellow
@@ -70,7 +84,8 @@ export default function ChessBoard({ position, currentMove, onPositionChange }: 
       transition={{ duration: 0.3 }}
       className="max-w-[500px] mx-auto"
     >
-      <Chessboard
+      <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+        <Chessboard
         position={position}
         boardOrientation="white"
         customSquareStyles={customSquareStyles}
@@ -128,6 +143,59 @@ export default function ChessBoard({ position, currentMove, onPositionChange }: 
           return typeof chess.turn === 'function' ? pieceColor === chess.turn() : true;
         }}
       />
+
+        {/* Move classification icon overlay */}
+        {currentMove && currentMove.to && currentMove.classification && boardWidth > 0 && (() => {
+          // map classification to an icon filename. Put your PNGs in `frontend/public/icons/`
+          const map: Record<string, string> = {
+            best: 'best.png',
+            excellent: 'excellent.png',
+            good: 'good.png',
+            inaccuracy: 'inaccuracy.png',
+            mistake: 'mistake.png',
+            blunder: 'blunder.png',
+          };
+
+          const clsKey = String(currentMove.classification).toLowerCase();
+          const iconFile = map[clsKey];
+          if (!iconFile) return null;
+
+          // Compute square position (top-left corner in pixels)
+          const squareSize = boardWidth / 8;
+          // file: a-h -> 0..7, rank: 1-8
+          const file = currentMove.to[0];
+          const rank = parseInt(currentMove.to[1], 10);
+          const fileIdx = 'abcdefgh'.indexOf(file);
+          // row index from top: for white orientation row 0 is rank 8, so row = 8 - rank
+          const rowIdx = 8 - rank;
+
+          const x = fileIdx * squareSize;
+          const y = rowIdx * squareSize;
+
+          const iconSize = Math.min(32, Math.max(16, Math.floor(squareSize * 0.35)));
+          const padding = 4;
+          const left = x + squareSize - iconSize - padding;
+          const top = y + padding;
+
+          const src = `/icons/${iconFile}`;
+
+          return (
+            <img
+              src={src}
+              alt={currentMove.classification}
+              style={{
+                position: 'absolute',
+                left: `${left}px`,
+                top: `${top}px`,
+                width: `${iconSize}px`,
+                height: `${iconSize}px`,
+                pointerEvents: 'none',
+                zIndex: 50,
+              }}
+            />
+          );
+        })()}
+      </div>
     </motion.div>
   );
 }
