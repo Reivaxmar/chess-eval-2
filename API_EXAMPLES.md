@@ -159,5 +159,6 @@ Accepts `{"username": "string", "game_index": number}` and fetches the game from
 - The API requires Stockfish to be installed on the system
 - Analysis depth is set to 15 with 0.1 seconds per position
 - The API has CORS enabled for `localhost:3000` (for the frontend)
-- Centipawn loss represents the amount of evaluation lost (always positive)
-- Delta values in responses show evaluation change from the player's perspective
+- Centipawn loss is calculated as `-delta * 100` where delta is the evaluation change from the player's perspective
+- Negative centipawn loss (improving moves) are classified as "Best"
+- Delta values in responses show evaluation change from the player's perspective (positive = improvement)

@@ -45,11 +45,11 @@ The move classification uses centipawn loss calculation:
 ```python
 # After converting evaluation to player's perspective:
 delta = eval_after - eval_before  # Change from player's perspective
-centipawn_loss = round(-delta * 100, 1)  # Convert to positive centipawns lost
+centipawn_loss = round(-delta * 100, 1)  # Calculate centipawn loss (negative for improving moves)
 ```
 
-Thresholds are applied with exclusive upper bounds:
-- [0, 20): Best
+Classification thresholds:
+- centipawn_loss < 20 (including negative values for improving moves): Best
 - [20, 50): Excellent
 - [50, 150): Good
 - [150, 300): Inaccuracy
