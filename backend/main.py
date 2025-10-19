@@ -29,6 +29,11 @@ class GameRequest(BaseModel):
 class AnalyzeRequest(BaseModel):
     pgn: str
 
+class BestMove(BaseModel):
+    move: str
+    from_square: str
+    to_square: str
+
 class MoveAnalysis(BaseModel):
     move_number: int
     move: str
@@ -36,12 +41,14 @@ class MoveAnalysis(BaseModel):
     eval_after: Optional[float]
     classification: str
     fen: str
+    best_move: Optional[BestMove] = None
 
 class MoveAnalysisSimple(BaseModel):
     move: str
     eval: Optional[float]
     delta: Optional[float]
     label: str
+    best_move: Optional[BestMove] = None
 
 class GameAnalysis(BaseModel):
     username: str
@@ -232,17 +239,25 @@ def analyze_game(pgn_text: str):
         board = game.board()
         moves_analysis = []
         
-        eval_before = None
+        # Analyze starting position
+        info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
+        score = info["score"].relative
+        eval_relative = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
+        eval_before = to_white_perspective(eval_relative, board.turn)
+        
         move_number = 1
         
         for move in game.mainline_moves():
-            # Get evaluation before move
-            if eval_before is None:
-                info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
-                score = info["score"].relative
-                eval_relative = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
-                # Convert to white's perspective: board.turn indicates whose turn it is to move
-                eval_before = to_white_perspective(eval_relative, board.turn)
+            # Get best move from previous analysis (before the actual move is made)
+            info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
+            best_move_info = None
+            if info.get("pv") and len(info["pv"]) > 0:
+                best_move_obj = info["pv"][0]
+                best_move_info = {
+                    "move": board.san(best_move_obj),
+                    "from_square": chess.square_name(best_move_obj.from_square),
+                    "to_square": chess.square_name(best_move_obj.to_square),
+                }
             
             # Determine whose move it is
             is_white_move = board.turn
@@ -261,6 +276,11 @@ def analyze_game(pgn_text: str):
             # Classify the move
             classification = classify_move(eval_before, eval_after, is_white_move)
             
+            # Only include best_move if the played move is not the best
+            best_move_data = None
+            if classification != "Best" and best_move_info:
+                best_move_data = best_move_info
+            
             moves_analysis.append({
                 "move_number": move_number,
                 "move": san_move,
@@ -268,6 +288,7 @@ def analyze_game(pgn_text: str):
                 "eval_after": eval_after,
                 "classification": classification,
                 "fen": board.fen(),
+                "best_move": best_move_data,
             })
             
             # Update for next iteration
@@ -350,16 +371,23 @@ def analyze_pgn_endpoint(request: AnalyzeRequest):
         board = game.board()
         moves_analysis = []
         
-        eval_before = None
+        # Analyze starting position
+        info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
+        score = info["score"].relative
+        eval_relative = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
+        eval_before = to_white_perspective(eval_relative, board.turn)
         
         for move in game.mainline_moves():
-            # Get evaluation before move
-            if eval_before is None:
-                info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
-                score = info["score"].relative
-                eval_relative = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
-                # Convert to white's perspective: board.turn indicates whose turn it is to move
-                eval_before = to_white_perspective(eval_relative, board.turn)
+            # Get best move from previous analysis (before the actual move is made)
+            info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
+            best_move_info = None
+            if info.get("pv") and len(info["pv"]) > 0:
+                best_move_obj = info["pv"][0]
+                best_move_info = {
+                    "move": board.san(best_move_obj),
+                    "from_square": chess.square_name(best_move_obj.from_square),
+                    "to_square": chess.square_name(best_move_obj.to_square),
+                }
             
             # Determine whose move it is
             is_white_move = board.turn
@@ -386,11 +414,17 @@ def analyze_pgn_endpoint(request: AnalyzeRequest):
             # Classify the move
             label = classify_move(eval_before, eval_after, is_white_move)
             
+            # Only include best_move if the played move is not the best
+            best_move_data = None
+            if label != "Best" and best_move_info:
+                best_move_data = best_move_info
+            
             moves_analysis.append({
                 "move": san_move,
                 "eval": eval_after,
                 "delta": delta,
                 "label": label,
+                "best_move": best_move_data,
             })
             
             # Update for next iteration
