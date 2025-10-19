@@ -58,14 +58,12 @@ export default function ChessBoard({ position, currentMove }: ChessBoardProps) {
       className="max-w-[500px] mx-auto"
     >
       <Chessboard
-        options={{
-          position: position,
-          boardOrientation: 'white',
-          squareStyles: customSquareStyles,
-          boardStyle: {
-            borderRadius: '4px',
-            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
-          },
+        position={position}
+        boardOrientation="white"
+        customSquareStyles={customSquareStyles}
+        customBoardStyle={{
+          borderRadius: '4px',
+          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
         }}
       />
     </motion.div>
