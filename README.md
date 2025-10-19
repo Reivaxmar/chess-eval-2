@@ -107,25 +107,43 @@ The frontend will run on `http://localhost:3000`
 
 ## Move Classification
 
-Moves are classified based on the change in position evaluation (in pawns):
+Moves are classified based on centipawn loss (change in position evaluation):
 
-- **Best**: Improves position (+0.1 or better)
-- **Good**: Maintains position (-0.1 to +0.1)
-- **Inaccuracy**: Small mistake (-0.1 to -2.0)
-- **Mistake**: Significant error (-2.0 to -4.0)
-- **Blunder**: Major error (worse than -4.0)
+- **Best**: <20 centipawns loss
+- **Excellent**: 20-50 centipawns loss
+- **Good**: 50-150 centipawns loss
+- **Inaccuracy**: 150-300 centipawns loss
+- **Mistake**: 300-600 centipawns loss
+- **Blunder**: >600 centipawns loss
 
 ## API Endpoints
 
 ### GET `/`
 Health check endpoint
+- Returns: `{"message": "Chess.com Game Analyzer API", "status": "running"}`
 
-### GET `/api/games/{username}`
+### GET `/games/{username}`
+Fetch PGNs for a Chess.com user
+- Returns: List of up to 20 recent games with PGN data
+- Example: `GET /games/magnuscarlsen`
+
+### POST `/analyze`
+Analyze a PGN directly
+- Request body: `{"pgn": "PGN string"}`
+- Returns: List of moves with `{move, eval, delta, label}`
+- Example:
+  ```json
+  {
+    "pgn": "[Event \"Game\"]\n1. e4 e5 2. Nf3 Nc6 *"
+  }
+  ```
+
+### GET `/api/games/{username}` (Legacy)
 Fetch recent games for a Chess.com user
-- Returns: List of up to 20 recent games
+- Returns: List of up to 20 recent games with metadata
 
-### POST `/api/analyze`
-Analyze a specific game
+### POST `/api/analyze` (Legacy)
+Analyze a specific game from Chess.com
 - Request body: `{"username": "string", "game_index": number}`
 - Returns: Full game analysis with move classifications and evaluations
 
