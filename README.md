@@ -131,12 +131,12 @@ Fetch PGNs for a Chess.com user
 Analyze a PGN directly
 - Request body: `{"pgn": "PGN string"}`
 - Returns: List of moves with `{move, eval, delta, label}`
-- Example:
-  ```json
-  {
-    "pgn": "[Event \"Game\"]\n1. e4 e5 2. Nf3 Nc6 *"
-  }
-  ```
+- Example request:
+```json
+{
+  "pgn": "[Event \"Game\"]\n1. e4 e5 2. Nf3 Nc6 *"
+}
+```
 
 ### GET `/api/games/{username}` (Legacy)
 Fetch recent games for a Chess.com user
