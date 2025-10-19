@@ -26,6 +26,9 @@ class GameRequest(BaseModel):
     username: str
     game_index: int = 0
 
+class AnalyzeRequest(BaseModel):
+    pgn: str
+
 class MoveAnalysis(BaseModel):
     move_number: int
     move: str
@@ -33,6 +36,12 @@ class MoveAnalysis(BaseModel):
     eval_after: Optional[float]
     classification: str
     fen: str
+
+class MoveAnalysisSimple(BaseModel):
+    move: str
+    eval: Optional[float]
+    delta: Optional[float]
+    label: str
 
 class GameAnalysis(BaseModel):
     username: str
@@ -139,7 +148,16 @@ def fetch_chess_com_games(username: str):
         raise HTTPException(status_code=400, detail=f"Failed to fetch games: {str(e)}")
 
 def classify_move(eval_before: Optional[float], eval_after: Optional[float], is_white_move: bool) -> str:
-    """Classify move quality based on evaluation change."""
+    """Classify move quality based on centipawn loss.
+    
+    Classification thresholds (centipawn loss):
+    - <20: Best
+    - 20-50: Excellent
+    - 50-150: Good
+    - 150-300: Inaccuracy
+    - 300-600: Mistake
+    - >600: Blunder
+    """
     if eval_before is None or eval_after is None:
         return "Unknown"
     
@@ -156,16 +174,23 @@ def classify_move(eval_before: Optional[float], eval_after: Optional[float], is_
         eval_before = -eval_before
         eval_after = -eval_after
     
+    # Calculate delta (change in evaluation from player's perspective)
     delta = eval_after - eval_before
     
-    # Classification thresholds (in pawns)
-    if delta >= 0.1:
+    # Convert to centipawns (from pawns) and round to avoid floating point issues
+    centipawn_loss = round(-delta * 100, 1)
+    
+    # Classification based on centipawn loss
+    # Ranges: [0,20), [20,50), [50,150), [150,300), [300,600), [600,∞)
+    if centipawn_loss < 20:
         return "Best"
-    elif delta >= -0.1:
+    elif centipawn_loss < 50:
+        return "Excellent"
+    elif centipawn_loss < 150:
         return "Good"
-    elif delta >= -2.0:
+    elif centipawn_loss < 300:
         return "Inaccuracy"
-    elif delta >= -4.0:
+    elif centipawn_loss < 600:
         return "Mistake"
     else:
         return "Blunder"
@@ -241,6 +266,25 @@ def analyze_game(pgn_text: str):
 def read_root():
     return {"message": "Chess.com Game Analyzer API", "status": "running"}
 
+@app.get("/games/{username}")
+def get_games_simple(username: str):
+    """Fetch PGNs for a Chess.com user (simplified endpoint per problem statement)."""
+    games = fetch_chess_com_games(username)
+    
+    # Return list of PGNs
+    pgn_list = []
+    for game in games[:20]:  # Limit to 20 most recent games
+        pgn = game.get("pgn")
+        if pgn:
+            pgn_list.append({
+                "pgn": pgn,
+                "white": game.get("white", {}).get("username", "Unknown"),
+                "black": game.get("black", {}).get("username", "Unknown"),
+                "url": game.get("url", ""),
+            })
+    
+    return pgn_list
+
 @app.get("/api/games/{username}")
 def get_games(username: str):
     """Fetch list of recent games for a Chess.com user."""
@@ -259,6 +303,76 @@ def get_games(username: str):
         })
     
     return {"games": game_list}
+
+@app.post("/analyze")
+def analyze_pgn_endpoint(request: AnalyzeRequest):
+    """Analyze a PGN directly (endpoint per problem statement).
+    
+    Input: {"pgn": "..."}
+    Output: List of moves with {move, eval, delta, label}
+    """
+    import io
+    import chess.pgn
+    
+    # Parse PGN
+    pgn_io = io.StringIO(request.pgn)
+    game = chess.pgn.read_game(pgn_io)
+    
+    if not game:
+        raise HTTPException(status_code=400, detail="Invalid PGN")
+    
+    # Initialize engine
+    engine = get_stockfish_engine()
+    
+    try:
+        board = game.board()
+        moves_analysis = []
+        
+        eval_before = None
+        
+        for move in game.mainline_moves():
+            # Get evaluation before move
+            if eval_before is None:
+                info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
+                score = info["score"].relative
+                eval_before = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
+            
+            # Determine whose move it is
+            is_white_move = board.turn
+            
+            # Make the move
+            san_move = board.san(move)
+            board.push(move)
+            
+            # Get evaluation after move
+            info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
+            score = info["score"].relative
+            eval_after = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
+            
+            # Calculate delta (from player's perspective)
+            delta = None
+            if eval_before is not None and eval_after is not None:
+                # Convert to player's perspective
+                eval_before_player = eval_before if is_white_move else -eval_before
+                eval_after_player = eval_after if is_white_move else -eval_after
+                delta = eval_after_player - eval_before_player
+            
+            # Classify the move
+            label = classify_move(eval_before, eval_after, is_white_move)
+            
+            moves_analysis.append({
+                "move": san_move,
+                "eval": eval_after,
+                "delta": delta,
+                "label": label,
+            })
+            
+            # Update for next iteration
+            eval_before = eval_after
+        
+        return moves_analysis
+    finally:
+        engine.quit()
 
 @app.post("/api/analyze")
 def analyze_game_endpoint(request: GameRequest):
