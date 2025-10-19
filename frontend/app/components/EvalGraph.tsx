@@ -22,6 +22,18 @@ export default function EvalGraph({ moves, currentMoveIndex }: EvalGraphProps) {
     isCurrentMove: idx === currentMoveIndex,
   }));
 
+  // Calculate dynamic domain to ensure 0 is centered
+  const evaluations = chartData
+    .map(d => d.evaluation)
+    .filter((e): e is number => e !== null);
+  
+  const maxAbsEval = evaluations.length > 0 
+    ? Math.max(...evaluations.map(e => Math.abs(e)))
+    : 10;
+  
+  // Set domain to symmetric around 0, with minimum of 3 and maximum of 20
+  const domainLimit = Math.min(Math.max(Math.ceil(maxAbsEval + 1), 3), 20);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -38,8 +50,8 @@ export default function EvalGraph({ moves, currentMoveIndex }: EvalGraphProps) {
             label={{ value: 'Move Number', position: 'insideBottom', offset: -5 }}
           />
           <YAxis 
-            domain={[-10, 10]}
-            label={{ value: 'Evaluation', angle: -90, position: 'insideLeft' }}
+            domain={[-domainLimit, domainLimit]}
+            label={{ value: 'Evaluation (White\'s perspective)', angle: -90, position: 'insideLeft' }}
           />
           <Tooltip 
             content={({ active, payload }) => {
