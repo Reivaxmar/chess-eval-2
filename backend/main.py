@@ -195,6 +195,20 @@ def classify_move(eval_before: Optional[float], eval_after: Optional[float], is_
     else:
         return "Blunder"
 
+def to_white_perspective(eval_relative: Optional[float], is_white_turn: bool) -> Optional[float]:
+    """Convert evaluation from side-to-move perspective to white's perspective.
+    
+    Args:
+        eval_relative: Evaluation from the perspective of the side to move
+        is_white_turn: True if it's white's turn, False if it's black's turn
+    
+    Returns:
+        Evaluation from white's perspective (positive = white better, negative = black better)
+    """
+    if eval_relative is None:
+        return None
+    return eval_relative if is_white_turn else -eval_relative
+
 def analyze_game(pgn_text: str):
     """Analyze a chess game using Stockfish."""
     import io
@@ -223,8 +237,7 @@ def analyze_game(pgn_text: str):
                 info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
                 score = info["score"].relative
                 eval_relative = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
-                # Convert to white's perspective (relative is from side to move perspective)
-                eval_before = eval_relative if board.turn else (-eval_relative if eval_relative is not None else None)
+                eval_before = to_white_perspective(eval_relative, board.turn)
             
             # Determine whose move it is
             is_white_move = board.turn
@@ -237,8 +250,7 @@ def analyze_game(pgn_text: str):
             info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
             score = info["score"].relative
             eval_relative = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
-            # Convert to white's perspective (relative is from side to move perspective)
-            eval_after = eval_relative if board.turn else (-eval_relative if eval_relative is not None else None)
+            eval_after = to_white_perspective(eval_relative, board.turn)
             
             # Classify the move
             classification = classify_move(eval_before, eval_after, is_white_move)
@@ -340,8 +352,7 @@ def analyze_pgn_endpoint(request: AnalyzeRequest):
                 info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
                 score = info["score"].relative
                 eval_relative = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
-                # Convert to white's perspective (relative is from side to move perspective)
-                eval_before = eval_relative if board.turn else (-eval_relative if eval_relative is not None else None)
+                eval_before = to_white_perspective(eval_relative, board.turn)
             
             # Determine whose move it is
             is_white_move = board.turn
@@ -354,8 +365,7 @@ def analyze_pgn_endpoint(request: AnalyzeRequest):
             info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
             score = info["score"].relative
             eval_relative = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
-            # Convert to white's perspective (relative is from side to move perspective)
-            eval_after = eval_relative if board.turn else (-eval_relative if eval_relative is not None else None)
+            eval_after = to_white_perspective(eval_relative, board.turn)
             
             # Calculate delta (from player's perspective)
             delta = None
