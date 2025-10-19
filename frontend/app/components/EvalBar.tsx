@@ -47,8 +47,13 @@ export default function EvalBar({ evaluation, isMate = false, mateInMoves }: Eva
   const whitePercentage = getWhitePercentage();
   const blackPercentage = 100 - whitePercentage;
 
+  // Determine if we should show the evaluation text
+  const showEvalText = evaluation !== null && !isMate;
+  const isWhiteWinning = evaluation !== null && evaluation > 0;
+  const evalText = evaluation !== null ? Math.abs(evaluation).toFixed(2) : '';
+
   return (
-    <div className="flex flex-col h-full w-8 bg-gray-200 rounded-md overflow-hidden shadow-md">
+    <div className="flex flex-col h-full w-8 bg-gray-200 rounded-md overflow-hidden shadow-md relative">
       {/* Black section (top) */}
       <motion.div
         className="bg-gray-900"
@@ -56,7 +61,15 @@ export default function EvalBar({ evaluation, isMate = false, mateInMoves }: Eva
         animate={{ height: `${blackPercentage}%` }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
       >
-        {/* Optional: Display evaluation text for black side */}
+        {/* Display evaluation text in white at top when black is winning */}
+        {showEvalText && !isWhiteWinning && blackPercentage > 15 && (
+          <div className="flex items-start justify-center pt-1">
+            <span className="text-white text-[10px] font-bold whitespace-nowrap">
+              {evalText}
+            </span>
+          </div>
+        )}
+        {/* Optional: Display mate text for black side */}
         {isMate && mateInMoves !== undefined && mateInMoves < 0 && (
           <div className="flex items-center justify-center h-full">
             <span className="text-white text-xs font-bold transform -rotate-90 whitespace-nowrap">
@@ -73,7 +86,15 @@ export default function EvalBar({ evaluation, isMate = false, mateInMoves }: Eva
         animate={{ height: `${whitePercentage}%` }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
       >
-        {/* Optional: Display evaluation text for white side */}
+        {/* Display evaluation text in black at bottom when white is winning */}
+        {showEvalText && isWhiteWinning && whitePercentage > 15 && (
+          <div className="flex items-end justify-center pb-1">
+            <span className="text-gray-900 text-[10px] font-bold whitespace-nowrap">
+              {evalText}
+            </span>
+          </div>
+        )}
+        {/* Optional: Display mate text for white side */}
         {isMate && mateInMoves !== undefined && mateInMoves > 0 && (
           <div className="flex items-center justify-center h-full">
             <span className="text-gray-900 text-xs font-bold transform -rotate-90 whitespace-nowrap">
