@@ -8,10 +8,12 @@
     "start": "next start"
   },
   "dependencies": {
+    "axios": "^1.12.2",
     "chess.js": "^1.4.0",
+    "framer-motion": "^12.23.24",
     "next": "15.5.6",
     "react": "19.1.0",
-    "react-chessboard": "^5.7.0",
+    "react-chessboard": "^4.7.3",
     "react-dom": "19.1.0",
     "recharts": "^3.3.0"
   },

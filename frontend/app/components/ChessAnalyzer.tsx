@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import axios from 'axios';
+import { motion } from 'framer-motion';
+import ChessBoard from './ChessBoard';
+import EvalGraph from './EvalGraph';
+import MoveInfo from './MoveInfo';
 
 interface MoveAnalysis {
   move_number: number;
@@ -12,6 +15,8 @@ interface MoveAnalysis {
   eval_after: number | null;
   classification: string;
   fen: string;
+  from?: string;
+  to?: string;
 }
 
 interface GameAnalysis {
@@ -65,12 +70,8 @@ export default function ChessAnalyzer() {
     setAnalysis(null);
 
     try {
-      const response = await fetch(`${API_BASE}/api/games/${username}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch games');
-      }
-      const data = await response.json();
-      setGames(data.games);
+      const response = await axios.get(`${API_BASE}/api/games/${username}`);
+      setGames(response.data.games);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch games');
     } finally {
@@ -85,23 +86,27 @@ export default function ChessAnalyzer() {
     setCurrentMoveIndex(-1);
 
     try {
-      const response = await fetch(`${API_BASE}/api/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username,
-          game_index: gameIndex,
-        }),
+      const response = await axios.post(`${API_BASE}/api/analyze`, {
+        username,
+        game_index: gameIndex,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to analyze game');
-      }
+      // Parse the moves to extract from/to squares
+      const chess = new Chess();
+      const movesWithSquares = response.data.moves.map((move: MoveAnalysis) => {
+        try {
+          const moveObj = chess.move(move.move);
+          return {
+            ...move,
+            from: moveObj?.from,
+            to: moveObj?.to,
+          };
+        } catch {
+          return move;
+        }
+      });
 
-      const data = await response.json();
-      setAnalysis(data);
+      setAnalysis({ ...response.data, moves: movesWithSquares });
       setSelectedGame(gameIndex);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to analyze game');
@@ -110,52 +115,7 @@ export default function ChessAnalyzer() {
     }
   };
 
-  const getClassificationColor = (classification: string) => {
-    switch (classification) {
-      case 'Best':
-        return 'text-green-600 bg-green-50';
-      case 'Good':
-        return 'text-blue-600 bg-blue-50';
-      case 'Inaccuracy':
-        return 'text-yellow-600 bg-yellow-50';
-      case 'Mistake':
-        return 'text-orange-600 bg-orange-50';
-      case 'Blunder':
-        return 'text-red-600 bg-red-50';
-      default:
-        return 'text-gray-600 bg-gray-50';
-    }
-  };
 
-  const getEvalChartData = () => {
-    if (!analysis) return [];
-    
-    return analysis.moves.map((move, idx) => ({
-      moveNumber: move.move_number,
-      evaluation: move.eval_after,
-      name: `${move.move_number}. ${move.move}`,
-    }));
-  };
-
-  const getMoveStats = () => {
-    if (!analysis) return null;
-
-    const stats = {
-      Best: 0,
-      Good: 0,
-      Inaccuracy: 0,
-      Mistake: 0,
-      Blunder: 0,
-    };
-
-    analysis.moves.forEach((move) => {
-      if (move.classification in stats) {
-        stats[move.classification as keyof typeof stats]++;
-      }
-    });
-
-    return stats;
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -165,7 +125,12 @@ export default function ChessAnalyzer() {
         </h1>
 
         {/* Username Input */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="bg-white rounded-lg shadow-md p-6 mb-6"
+        >
           <div className="flex gap-4">
             <input
               type="text"
@@ -184,17 +149,25 @@ export default function ChessAnalyzer() {
             </button>
           </div>
           {error && <p className="mt-2 text-red-600">{error}</p>}
-        </div>
+        </motion.div>
 
         {/* Games List */}
         {games.length > 0 && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="bg-white rounded-lg shadow-md p-6 mb-6"
+          >
             <h2 className="text-2xl font-semibold mb-4 text-gray-900">Recent Games</h2>
             <div className="grid gap-3">
-              {games.map((game) => (
-                <div
+              {games.map((game, idx) => (
+                <motion.div
                   key={game.index}
-                  className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 ${
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: idx * 0.05 }}
+                  className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
                     selectedGame === game.index ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
                   }`}
                   onClick={() => analyzeGame(game.index)}
@@ -207,10 +180,10 @@ export default function ChessAnalyzer() {
                       {game.time_class} • {game.result}
                     </span>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Analysis Loading */}
@@ -223,154 +196,88 @@ export default function ChessAnalyzer() {
 
         {/* Analysis Results */}
         {analysis && !analyzing && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          >
             {/* Left Column: Board and Controls */}
             <div className="space-y-6">
-              <div className="bg-white rounded-lg shadow-md p-6">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4 }}
+                className="bg-white rounded-lg shadow-md p-6"
+              >
                 <h2 className="text-2xl font-semibold mb-4 text-gray-900">
                   {analysis.white_player} vs {analysis.black_player}
                 </h2>
-                <div className="mb-4 max-w-[500px] mx-auto">
-                  <Chessboard
-                    options={{
-                      position: boardPosition,
-                      boardOrientation: 'white',
-                      boardStyle: {
-                        borderRadius: '4px',
-                        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
-                      },
-                    }}
-                  />
-                </div>
+                
+                <ChessBoard
+                  position={boardPosition}
+                  currentMove={
+                    currentMoveIndex >= 0 && analysis.moves[currentMoveIndex]
+                      ? {
+                          from: analysis.moves[currentMoveIndex].from || '',
+                          to: analysis.moves[currentMoveIndex].to || '',
+                          classification: analysis.moves[currentMoveIndex].classification,
+                        }
+                      : null
+                  }
+                />
 
                 {/* Move Navigation */}
-                <div className="flex gap-2 items-center justify-center">
+                <div className="flex gap-2 items-center justify-center mt-4">
                   <button
                     onClick={() => setCurrentMoveIndex(-1)}
-                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 transition-colors"
                     disabled={currentMoveIndex === -1}
                   >
                     Start
                   </button>
                   <button
                     onClick={() => setCurrentMoveIndex(Math.max(-1, currentMoveIndex - 1))}
-                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 transition-colors"
                     disabled={currentMoveIndex <= -1}
                   >
                     ←
                   </button>
-                  <span className="px-4 text-gray-700">
+                  <span className="px-4 text-gray-700 font-medium">
                     {currentMoveIndex >= 0
                       ? `Move ${currentMoveIndex + 1}/${analysis.moves.length}`
                       : 'Start Position'}
                   </span>
                   <button
-                    onClick={() => setCurrentMoveIndex(Math.min(analysis.moves.length - 1, currentMoveIndex + 1))}
-                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+                    onClick={() =>
+                      setCurrentMoveIndex(Math.min(analysis.moves.length - 1, currentMoveIndex + 1))
+                    }
+                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 transition-colors"
                     disabled={currentMoveIndex >= analysis.moves.length - 1}
                   >
                     →
                   </button>
                   <button
                     onClick={() => setCurrentMoveIndex(analysis.moves.length - 1)}
-                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 transition-colors"
                     disabled={currentMoveIndex === analysis.moves.length - 1}
                   >
                     End
                   </button>
                 </div>
-
-                {/* Current Move Info */}
-                {currentMoveIndex >= 0 && analysis.moves[currentMoveIndex] && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="text-center">
-                      <span className="text-lg font-semibold">
-                        {analysis.moves[currentMoveIndex].move}
-                      </span>
-                      <span
-                        className={`ml-3 px-3 py-1 rounded-full text-sm font-medium ${getClassificationColor(
-                          analysis.moves[currentMoveIndex].classification
-                        )}`}
-                      >
-                        {analysis.moves[currentMoveIndex].classification}
-                      </span>
-                    </div>
-                    {analysis.moves[currentMoveIndex].eval_after !== null && (
-                      <p className="text-center mt-2 text-gray-600">
-                        Eval: {analysis.moves[currentMoveIndex].eval_after?.toFixed(2)}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Move Statistics */}
-              {getMoveStats() && (
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <h3 className="text-xl font-semibold mb-4 text-gray-900">Move Statistics</h3>
-                  <div className="space-y-2">
-                    {Object.entries(getMoveStats()!).map(([classification, count]) => (
-                      <div key={classification} className="flex justify-between items-center">
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getClassificationColor(classification)}`}>
-                          {classification}
-                        </span>
-                        <span className="text-gray-700 font-semibold">{count}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              </motion.div>
             </div>
 
-            {/* Right Column: Evaluation Graph and Moves */}
+            {/* Right Column: Evaluation Graph and Move Info */}
             <div className="space-y-6">
-              {/* Evaluation Graph */}
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-xl font-semibold mb-4 text-gray-900">Evaluation Chart</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={getEvalChartData()}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="moveNumber" />
-                    <YAxis domain={[-10, 10]} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="evaluation" stroke="#3b82f6" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Moves List */}
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-xl font-semibold mb-4 text-gray-900">Moves</h3>
-                <div className="max-h-96 overflow-y-auto">
-                  <div className="space-y-2">
-                    {analysis.moves.map((move, idx) => (
-                      <div
-                        key={idx}
-                        className={`p-3 rounded-lg cursor-pointer hover:bg-gray-50 ${
-                          currentMoveIndex === idx ? 'bg-blue-50 border border-blue-300' : 'border border-gray-200'
-                        }`}
-                        onClick={() => setCurrentMoveIndex(idx)}
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">
-                            {move.move_number}. {move.move}
-                          </span>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getClassificationColor(move.classification)}`}>
-                            {move.classification}
-                          </span>
-                        </div>
-                        {move.eval_after !== null && (
-                          <p className="text-sm text-gray-600 mt-1">
-                            Eval: {move.eval_after.toFixed(2)}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <EvalGraph moves={analysis.moves} currentMoveIndex={currentMoveIndex} />
+              <MoveInfo
+                moves={analysis.moves}
+                currentMoveIndex={currentMoveIndex}
+                onMoveClick={(idx) => setCurrentMoveIndex(idx)}
+              />
             </div>
-          </div>
+          </motion.div>
         )}
       </div>
     </div>
