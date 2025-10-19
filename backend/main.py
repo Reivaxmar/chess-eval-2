@@ -105,6 +105,14 @@ def classify_move(eval_before: Optional[float], eval_after: Optional[float], is_
     if eval_before is None or eval_after is None:
         return "Unknown"
     
+    # Handle mate scores
+    if abs(eval_before) > 50 or abs(eval_after) > 50:
+        # If we're winning with mate, it's a best move
+        # If we're losing and delivered mate, it's still best
+        if abs(eval_after) > 50:
+            return "Best"
+        return "Unknown"
+    
     # Convert from white's perspective
     if not is_white_move:
         eval_before = -eval_before
