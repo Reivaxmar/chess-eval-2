@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Chessboard } from 'react-chessboard';
+import type { Square } from 'react-chessboard/dist/chessboard/types';
 import { Chess } from 'chess.js';
 import { motion } from 'framer-motion';
 
@@ -11,6 +12,11 @@ interface ChessBoardProps {
     from: string;
     to: string;
     classification: string;
+    best_move?: {
+      move: string;
+      from_square: string;
+      to_square: string;
+    } | null;
   } | null;
   onPositionChange?: (fen: string) => void;
 }
@@ -77,6 +83,16 @@ export default function ChessBoard({ position, currentMove, onPositionChange }: 
     };
   }, [currentMove]);
 
+  // Get arrows to show best move
+  const customArrows = useMemo((): [Square, Square, string][] => {
+    if (!currentMove || !currentMove.best_move) return [];
+    
+    // Show arrow for the best move when the played move was not the best
+    const from = currentMove.best_move.from_square as Square;
+    const to = currentMove.best_move.to_square as Square;
+    return [[from, to, 'rgb(0, 128, 255)']];
+  }, [currentMove]);
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -89,6 +105,7 @@ export default function ChessBoard({ position, currentMove, onPositionChange }: 
         position={position}
         boardOrientation="white"
         customSquareStyles={customSquareStyles}
+        customArrows={customArrows}
         customBoardStyle={{
           borderRadius: '4px',
           boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',

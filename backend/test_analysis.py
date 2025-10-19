@@ -45,6 +45,8 @@ def test_analysis():
                 print(f"  Eval before: {move['eval_before']:.2f}")
             if move['eval_after'] is not None:
                 print(f"  Eval after: {move['eval_after']:.2f}")
+            if move.get('best_move'):
+                print(f"  Best move was: {move['best_move']['move']} ({move['best_move']['from_square']}-{move['best_move']['to_square']})")
         
         print("\n" + "=" * 50)
         print("✓ Analysis completed successfully!")

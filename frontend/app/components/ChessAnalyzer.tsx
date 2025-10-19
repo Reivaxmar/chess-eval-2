@@ -17,6 +17,11 @@ interface MoveAnalysis {
   fen: string;
   from?: string;
   to?: string;
+  best_move?: {
+    move: string;
+    from_square: string;
+    to_square: string;
+  } | null;
 }
 
 interface GameAnalysis {
@@ -222,6 +227,7 @@ export default function ChessAnalyzer() {
                           from: analysis.moves[currentMoveIndex].from || '',
                           to: analysis.moves[currentMoveIndex].to || '',
                           classification: analysis.moves[currentMoveIndex].classification,
+                          best_move: analysis.moves[currentMoveIndex].best_move,
                         }
                       : null
                   }
