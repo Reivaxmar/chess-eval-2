@@ -22,6 +22,9 @@ interface MoveAnalysis {
     from_square: string;
     to_square: string;
   } | null;
+  win_percent_before?: number | null;
+  win_percent_after?: number | null;
+  accuracy?: number | null;
 }
 
 interface GameAnalysis {
@@ -31,6 +34,8 @@ interface GameAnalysis {
   result: string;
   moves: MoveAnalysis[];
   pgn: string;
+  white_accuracy?: number | null;
+  black_accuracy?: number | null;
 }
 
 interface Game {
@@ -302,6 +307,8 @@ export default function ChessAnalyzer() {
                 moves={analysis.moves}
                 currentMoveIndex={currentMoveIndex}
                 onMoveClick={(idx) => setCurrentMoveIndex(idx)}
+                whiteAccuracy={analysis.white_accuracy}
+                blackAccuracy={analysis.black_accuracy}
               />
             </div>
           </motion.div>

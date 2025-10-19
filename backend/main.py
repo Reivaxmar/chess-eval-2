@@ -42,6 +42,9 @@ class MoveAnalysis(BaseModel):
     classification: str
     fen: str
     best_move: Optional[BestMove] = None
+    win_percent_before: Optional[float] = None
+    win_percent_after: Optional[float] = None
+    accuracy: Optional[float] = None
 
 class MoveAnalysisSimple(BaseModel):
     move: str
@@ -57,6 +60,8 @@ class GameAnalysis(BaseModel):
     result: str
     moves: List[MoveAnalysis]
     pgn: str
+    white_accuracy: Optional[float] = None
+    black_accuracy: Optional[float] = None
 
 def get_stockfish_engine():
     """Get or initialize Stockfish engine."""
@@ -87,6 +92,72 @@ def get_stockfish_engine():
         )
     
     return chess.engine.SimpleEngine.popen_uci(stockfish_path)
+
+def centipawn_to_win_percent(cp: float) -> float:
+    """Convert centipawn evaluation to win percentage using Lichess formula.
+    
+    Formula: Win% = 50 + 50 * (2 / (1 + exp(-0.00368208 * cp)) - 1)
+    
+    Args:
+        cp: Centipawn evaluation (positive favors white, negative favors black)
+    
+    Returns:
+        Win percentage from white's perspective (0-100)
+    """
+    import math
+    return 50 + 50 * (2 / (1 + math.exp(-0.00368208 * cp)) - 1)
+
+def calculate_move_accuracy(win_percent_before: float, win_percent_after: float) -> float:
+    """Calculate move accuracy using Lichess formula.
+    
+    Formula: Accuracy% = 103.1668 * exp(-0.04354 * (winBefore - winAfter)) - 3.1669
+    Clamped to [0, 100]
+    
+    Args:
+        win_percent_before: Win percentage before the move
+        win_percent_after: Win percentage after the move (from mover's perspective)
+    
+    Returns:
+        Move accuracy percentage (0-100)
+    """
+    import math
+    # Calculate the win percentage loss
+    win_loss = win_percent_before - win_percent_after
+    
+    # Apply Lichess formula
+    accuracy = 103.1668 * math.exp(-0.04354 * win_loss) - 3.1669
+    
+    # Clamp to [0, 100]
+    return max(0, min(100, accuracy))
+
+def calculate_game_accuracy(accuracies: List[float]) -> float:
+    """Calculate overall game accuracy as average of volatility-weighted and harmonic means.
+    
+    Args:
+        accuracies: List of move accuracy percentages
+    
+    Returns:
+        Overall game accuracy percentage
+    """
+    if not accuracies or len(accuracies) == 0:
+        return 0.0
+    
+    # Filter out any invalid values
+    valid_accuracies = [a for a in accuracies if a is not None and a > 0]
+    if not valid_accuracies:
+        return 0.0
+    
+    # Calculate arithmetic mean for volatility-weighted approximation
+    # In a full implementation, volatility weights would be calculated based on position complexity
+    # For now, we use simple arithmetic mean as the volatility-weighted mean
+    arithmetic_mean = sum(valid_accuracies) / len(valid_accuracies)
+    
+    # Calculate harmonic mean
+    # Harmonic mean = n / (sum(1/x_i))
+    harmonic_mean = len(valid_accuracies) / sum(1/a for a in valid_accuracies)
+    
+    # Return average of the two means
+    return (arithmetic_mean + harmonic_mean) / 2
 
 def fetch_chess_com_games(username: str):
     """Fetch recent games from Chess.com API."""
@@ -276,6 +347,32 @@ def analyze_game(pgn_text: str):
             # Classify the move
             classification = classify_move(eval_before, eval_after, is_white_move)
             
+            # Calculate accuracy metrics
+            win_percent_before = None
+            win_percent_after = None
+            accuracy = None
+            
+            if eval_before is not None and eval_after is not None:
+                # Convert evaluations to centipawns
+                cp_before = eval_before * 100
+                cp_after = eval_after * 100
+                
+                # Calculate win percentages from white's perspective
+                win_percent_before_white = centipawn_to_win_percent(cp_before)
+                win_percent_after_white = centipawn_to_win_percent(cp_after)
+                
+                # Convert to current player's perspective for accuracy calculation
+                if is_white_move:
+                    win_percent_before = win_percent_before_white
+                    win_percent_after = win_percent_after_white
+                else:
+                    # For black, flip the win percentages
+                    win_percent_before = 100 - win_percent_before_white
+                    win_percent_after = 100 - win_percent_after_white
+                
+                # Calculate move accuracy
+                accuracy = calculate_move_accuracy(win_percent_before, win_percent_after)
+            
             # Only include best_move if the played move is not the best
             best_move_data = None
             if classification != "Best" and best_move_info:
@@ -289,6 +386,9 @@ def analyze_game(pgn_text: str):
                 "classification": classification,
                 "fen": board.fen(),
                 "best_move": best_move_data,
+                "win_percent_before": win_percent_before,
+                "win_percent_after": win_percent_after,
+                "accuracy": accuracy,
             })
             
             # Update for next iteration
@@ -296,11 +396,23 @@ def analyze_game(pgn_text: str):
             if not is_white_move:
                 move_number += 1
         
+        # Calculate overall accuracy for white and black
+        white_moves = [m for m in moves_analysis if m["move_number"] == (moves_analysis.index(m) // 2) + 1 and moves_analysis.index(m) % 2 == 0]
+        black_moves = [m for m in moves_analysis if moves_analysis.index(m) % 2 == 1]
+        
+        white_accuracies = [m["accuracy"] for m in white_moves if m.get("accuracy") is not None]
+        black_accuracies = [m["accuracy"] for m in black_moves if m.get("accuracy") is not None]
+        
+        white_accuracy = calculate_game_accuracy(white_accuracies) if white_accuracies else None
+        black_accuracy = calculate_game_accuracy(black_accuracies) if black_accuracies else None
+        
         return {
             "white_player": game.headers.get("White", "Unknown"),
             "black_player": game.headers.get("Black", "Unknown"),
             "result": game.headers.get("Result", "*"),
             "moves": moves_analysis,
+            "white_accuracy": white_accuracy,
+            "black_accuracy": black_accuracy,
         }
     finally:
         engine.quit()
