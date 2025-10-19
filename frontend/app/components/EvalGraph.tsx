@@ -76,10 +76,13 @@ export default function EvalGraph({ moves, currentMoveIndex }: EvalGraphProps) {
             stroke="#3b82f6" 
             strokeWidth={2}
             dot={(props: any) => {
-              const { cx, cy, payload } = props;
+              const { cx, cy, payload, index } = props;
+              // create a stable key using move number and index
+              const key = payload?.moveNumber !== undefined ? `${payload.moveNumber}-${index}` : `dot-${index}`;
               if (payload.isCurrentMove) {
                 return (
                   <circle
+                    key={key}
                     cx={cx}
                     cy={cy}
                     r={6}
@@ -91,6 +94,7 @@ export default function EvalGraph({ moves, currentMoveIndex }: EvalGraphProps) {
               }
               return (
                 <circle
+                  key={key}
                   cx={cx}
                   cy={cy}
                   r={3}

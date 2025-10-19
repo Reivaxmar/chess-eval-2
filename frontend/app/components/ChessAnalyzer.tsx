@@ -225,6 +225,22 @@ export default function ChessAnalyzer() {
                         }
                       : null
                   }
+                  onPositionChange={(fen: string) => {
+                    // Update the controlled board position when a legal move is made on the board
+                    setBoardPosition(fen);
+
+                    // Try to match the new FEN to one of the analyzed moves and update currentMoveIndex
+                    if (!analysis) return;
+                    const foundIdx = analysis.moves.findIndex((m) => m.fen === fen);
+                    if (foundIdx !== -1) {
+                      setCurrentMoveIndex(foundIdx);
+                    } else {
+                      // If not found, set to last move if the FEN is identical to the final position
+                      if (analysis.moves.length > 0 && analysis.moves[analysis.moves.length - 1].fen === fen) {
+                        setCurrentMoveIndex(analysis.moves.length - 1);
+                      }
+                    }
+                  }}
                 />
 
                 {/* Move Navigation */}
