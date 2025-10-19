@@ -200,10 +200,14 @@ def to_white_perspective(eval_relative: Optional[float], is_white_turn: bool) ->
     
     Args:
         eval_relative: Evaluation from the perspective of the side to move
-        is_white_turn: True if it's white's turn, False if it's black's turn
+        is_white_turn: True if white is to move, False if black is to move
     
     Returns:
         Evaluation from white's perspective (positive = white better, negative = black better)
+    
+    Example:
+        If white is to move and eval_relative is +0.5, returns +0.5 (white is better)
+        If black is to move and eval_relative is +0.5, returns -0.5 (black sees +0.5 but white sees -0.5)
     """
     if eval_relative is None:
         return None
@@ -237,6 +241,7 @@ def analyze_game(pgn_text: str):
                 info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
                 score = info["score"].relative
                 eval_relative = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
+                # Convert to white's perspective: board.turn indicates whose turn it is to move
                 eval_before = to_white_perspective(eval_relative, board.turn)
             
             # Determine whose move it is
@@ -250,6 +255,7 @@ def analyze_game(pgn_text: str):
             info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
             score = info["score"].relative
             eval_relative = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
+            # Convert to white's perspective: board.turn now indicates the next side to move (opponent)
             eval_after = to_white_perspective(eval_relative, board.turn)
             
             # Classify the move
@@ -352,6 +358,7 @@ def analyze_pgn_endpoint(request: AnalyzeRequest):
                 info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
                 score = info["score"].relative
                 eval_relative = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
+                # Convert to white's perspective: board.turn indicates whose turn it is to move
                 eval_before = to_white_perspective(eval_relative, board.turn)
             
             # Determine whose move it is
@@ -365,6 +372,7 @@ def analyze_pgn_endpoint(request: AnalyzeRequest):
             info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
             score = info["score"].relative
             eval_relative = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
+            # Convert to white's perspective: board.turn now indicates the next side to move (opponent)
             eval_after = to_white_perspective(eval_relative, board.turn)
             
             # Calculate delta (from player's perspective)
