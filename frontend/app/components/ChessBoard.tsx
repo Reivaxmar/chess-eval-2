@@ -106,7 +106,7 @@ export default function ChessBoard({ position, currentMove, onPositionChange, ev
     >
       <div className="flex gap-2 items-stretch">
         {/* Evaluation Bar on the left */}
-        <div style={{ width: '32px', minHeight: '400px' }}>
+        <div className="w-8 min-h-[400px]">
           <EvalBar evaluation={evaluation ?? null} isMate={isMate} mateInMoves={mateInMoves} />
         </div>
         

@@ -20,7 +20,7 @@ export default function EvalBar({ evaluation, isMate = false, mateInMoves }: Eva
         // Positive mate means white is winning, negative means black is winning
         return mateInMoves > 0 ? 100 : 0;
       }
-      return evaluation && evaluation > 0 ? 100 : 0;
+      return evaluation !== null && evaluation > 0 ? 100 : 0;
     }
     
     if (evaluation === null) {
@@ -39,8 +39,7 @@ export default function EvalBar({ evaluation, isMate = false, mateInMoves }: Eva
     
     // Sigmoid transformation: percentage = 50 + (50 * tanh(eval / 4))
     // This gives a nice smooth curve
-    const tanh = (x: number) => (Math.exp(x) - Math.exp(-x)) / (Math.exp(x) + Math.exp(-x));
-    const percentage = 50 + (50 * tanh(clampedEval / 4));
+    const percentage = 50 + (50 * Math.tanh(clampedEval / 4));
     
     return Math.max(0, Math.min(100, percentage));
   };
