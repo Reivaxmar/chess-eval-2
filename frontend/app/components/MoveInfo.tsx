@@ -90,7 +90,7 @@ export default function MoveInfo({ moves, currentMoveIndex, onMoveClick, whiteAc
               {moves[currentMoveIndex].classification}
             </span>
           </div>
-          {moves[currentMoveIndex].accuracy !== null && moves[currentMoveIndex].accuracy !== undefined && (
+          {moves[currentMoveIndex].accuracy !== null && moves[currentMoveIndex].accuracy !== undefined && typeof moves[currentMoveIndex].accuracy === 'number' && (
             <p className="text-center mt-2 text-lg font-semibold text-indigo-600">
               Accuracy: {moves[currentMoveIndex].accuracy.toFixed(1)}%
             </p>
@@ -190,7 +190,7 @@ export default function MoveInfo({ moves, currentMoveIndex, onMoveClick, whiteAc
                     {move.move_number}. {move.move}
                   </span>
                   <div className="flex gap-2 items-center">
-                    {move.accuracy !== null && move.accuracy !== undefined && (
+                    {move.accuracy !== null && move.accuracy !== undefined && typeof move.accuracy === 'number' && (
                       <span className="px-2 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">
                         {move.accuracy.toFixed(1)}%
                       </span>

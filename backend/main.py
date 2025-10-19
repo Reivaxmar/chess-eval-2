@@ -6,6 +6,7 @@ import requests
 import chess
 import chess.engine
 import os
+import math
 from pathlib import Path
 
 app = FastAPI(title="Chess.com Game Analyzer")
@@ -104,7 +105,6 @@ def centipawn_to_win_percent(cp: float) -> float:
     Returns:
         Win percentage from white's perspective (0-100)
     """
-    import math
     return 50 + 50 * (2 / (1 + math.exp(-0.00368208 * cp)) - 1)
 
 def calculate_move_accuracy(win_percent_before: float, win_percent_after: float) -> float:
@@ -120,7 +120,6 @@ def calculate_move_accuracy(win_percent_before: float, win_percent_after: float)
     Returns:
         Move accuracy percentage (0-100)
     """
-    import math
     # Calculate the win percentage loss
     win_loss = win_percent_before - win_percent_after
     
@@ -397,8 +396,9 @@ def analyze_game(pgn_text: str):
                 move_number += 1
         
         # Calculate overall accuracy for white and black
-        white_moves = [m for m in moves_analysis if m["move_number"] == (moves_analysis.index(m) // 2) + 1 and moves_analysis.index(m) % 2 == 0]
-        black_moves = [m for m in moves_analysis if moves_analysis.index(m) % 2 == 1]
+        # White plays on even indices (0, 2, 4, ...), Black plays on odd indices (1, 3, 5, ...)
+        white_moves = [m for i, m in enumerate(moves_analysis) if i % 2 == 0]
+        black_moves = [m for i, m in enumerate(moves_analysis) if i % 2 == 1]
         
         white_accuracies = [m["accuracy"] for m in white_moves if m.get("accuracy") is not None]
         black_accuracies = [m["accuracy"] for m in black_moves if m.get("accuracy") is not None]
