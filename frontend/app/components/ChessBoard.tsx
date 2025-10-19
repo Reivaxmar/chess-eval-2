@@ -5,6 +5,7 @@ import { Chessboard } from 'react-chessboard';
 import type { Square } from 'react-chessboard/dist/chessboard/types';
 import { Chess } from 'chess.js';
 import { motion } from 'framer-motion';
+import EvalBar from './EvalBar';
 
 interface ChessBoardProps {
   position: string;
@@ -19,9 +20,12 @@ interface ChessBoardProps {
     } | null;
   } | null;
   onPositionChange?: (fen: string) => void;
+  evaluation?: number | null;
+  isMate?: boolean;
+  mateInMoves?: number;
 }
 
-export default function ChessBoard({ position, currentMove, onPositionChange }: ChessBoardProps) {
+export default function ChessBoard({ position, currentMove, onPositionChange, evaluation, isMate, mateInMoves }: ChessBoardProps) {
   const chessRef = useRef(new Chess());
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [boardWidth, setBoardWidth] = useState<number>(0);
@@ -100,8 +104,15 @@ export default function ChessBoard({ position, currentMove, onPositionChange }: 
       transition={{ duration: 0.3 }}
       className="max-w-[500px] mx-auto"
     >
-      <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
-        <Chessboard
+      <div className="flex gap-2 items-stretch">
+        {/* Evaluation Bar on the left */}
+        <div style={{ width: '32px', minHeight: '400px' }}>
+          <EvalBar evaluation={evaluation ?? null} isMate={isMate} mateInMoves={mateInMoves} />
+        </div>
+        
+        {/* Chess Board */}
+        <div ref={containerRef} style={{ position: 'relative', flex: 1 }}>
+          <Chessboard
         position={position}
         boardOrientation="white"
         customSquareStyles={customSquareStyles}
@@ -212,6 +223,7 @@ export default function ChessBoard({ position, currentMove, onPositionChange }: 
             />
           );
         })()}
+        </div>
       </div>
     </motion.div>
   );

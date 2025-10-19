@@ -231,6 +231,11 @@ export default function ChessAnalyzer() {
                         }
                       : null
                   }
+                  evaluation={
+                    currentMoveIndex >= 0 && analysis.moves[currentMoveIndex]
+                      ? analysis.moves[currentMoveIndex].eval_after
+                      : null
+                  }
                   onPositionChange={(fen: string) => {
                     // Update the controlled board position when a legal move is made on the board
                     setBoardPosition(fen);
