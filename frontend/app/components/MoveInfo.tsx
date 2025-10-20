@@ -10,6 +10,8 @@ interface MoveData {
   classification: string;
   fen: string;
   accuracy?: number | null;
+  is_mate_after?: boolean | null;
+  mate_in_after?: number | null;
 }
 
 interface MoveInfoProps {
@@ -95,11 +97,15 @@ export default function MoveInfo({ moves, currentMoveIndex, onMoveClick, whiteAc
               Accuracy: {moves[currentMoveIndex].accuracy.toFixed(1)}%
             </p>
           )}
-          {moves[currentMoveIndex].eval_after !== null && (
+          {moves[currentMoveIndex].is_mate_after && moves[currentMoveIndex].mate_in_after !== null && moves[currentMoveIndex].mate_in_after !== undefined ? (
+            <p className="text-center mt-1 text-gray-600 font-bold">
+              Mate in {Math.abs(moves[currentMoveIndex].mate_in_after!)}
+            </p>
+          ) : moves[currentMoveIndex].eval_after !== null ? (
             <p className="text-center mt-1 text-gray-600">
               Evaluation: {moves[currentMoveIndex].eval_after.toFixed(2)}
             </p>
-          )}
+          ) : null}
         </motion.div>
       )}
 
@@ -204,11 +210,15 @@ export default function MoveInfo({ moves, currentMoveIndex, onMoveClick, whiteAc
                     </span>
                   </div>
                 </div>
-                {move.eval_after !== null && (
+                {move.is_mate_after && move.mate_in_after !== null && move.mate_in_after !== undefined ? (
+                  <p className="text-sm text-gray-600 mt-1 font-bold">
+                    Mate in {Math.abs(move.mate_in_after)}
+                  </p>
+                ) : move.eval_after !== null ? (
                   <p className="text-sm text-gray-600 mt-1">
                     Eval: {move.eval_after.toFixed(2)}
                   </p>
-                )}
+                ) : null}
               </motion.div>
             ))}
           </div>

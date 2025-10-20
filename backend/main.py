@@ -46,6 +46,10 @@ class MoveAnalysis(BaseModel):
     win_percent_before: Optional[float] = None
     win_percent_after: Optional[float] = None
     accuracy: Optional[float] = None
+    is_mate_before: Optional[bool] = None
+    is_mate_after: Optional[bool] = None
+    mate_in_before: Optional[int] = None
+    mate_in_after: Optional[int] = None
 
 class MoveAnalysisSimple(BaseModel):
     move: str
@@ -53,6 +57,8 @@ class MoveAnalysisSimple(BaseModel):
     delta: Optional[float]
     label: str
     best_move: Optional[BestMove] = None
+    is_mate: Optional[bool] = None
+    mate_in: Optional[int] = None
 
 class GameAnalysis(BaseModel):
     username: str
@@ -312,8 +318,17 @@ def analyze_game(pgn_text: str):
         # Analyze starting position
         info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
         score = info["score"].relative
+        
+        # Check if it's a mate score
+        is_mate_before = score.is_mate()
+        mate_in_before = score.mate() if is_mate_before else None
+        
         eval_relative = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
         eval_before = to_white_perspective(eval_relative, board.turn)
+        
+        # Adjust mate_in for white's perspective
+        if mate_in_before is not None:
+            mate_in_before = mate_in_before if board.turn else -mate_in_before
         
         move_number = 1
         
@@ -339,9 +354,18 @@ def analyze_game(pgn_text: str):
             # Get evaluation after move
             info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
             score = info["score"].relative
+            
+            # Check if it's a mate score
+            is_mate_after = score.is_mate()
+            mate_in_after = score.mate() if is_mate_after else None
+            
             eval_relative = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
             # Convert to white's perspective: board.turn now indicates the next side to move (opponent)
             eval_after = to_white_perspective(eval_relative, board.turn)
+            
+            # Adjust mate_in_after for white's perspective
+            if mate_in_after is not None:
+                mate_in_after = mate_in_after if board.turn else -mate_in_after
             
             # Classify the move
             classification = classify_move(eval_before, eval_after, is_white_move)
@@ -388,10 +412,16 @@ def analyze_game(pgn_text: str):
                 "win_percent_before": win_percent_before,
                 "win_percent_after": win_percent_after,
                 "accuracy": accuracy,
+                "is_mate_before": is_mate_before,
+                "is_mate_after": is_mate_after,
+                "mate_in_before": mate_in_before,
+                "mate_in_after": mate_in_after,
             })
             
             # Update for next iteration
             eval_before = eval_after
+            is_mate_before = is_mate_after
+            mate_in_before = mate_in_after
             if not is_white_move:
                 move_number += 1
         
@@ -486,8 +516,14 @@ def analyze_pgn_endpoint(request: AnalyzeRequest):
         # Analyze starting position
         info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
         score = info["score"].relative
+        is_mate_before = score.is_mate()
+        mate_in_before = score.mate() if is_mate_before else None
+        
         eval_relative = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
         eval_before = to_white_perspective(eval_relative, board.turn)
+        
+        if mate_in_before is not None:
+            mate_in_before = mate_in_before if board.turn else -mate_in_before
         
         for move in game.mainline_moves():
             # Get best move from previous analysis (before the actual move is made)
@@ -511,9 +547,15 @@ def analyze_pgn_endpoint(request: AnalyzeRequest):
             # Get evaluation after move
             info = engine.analyse(board, chess.engine.Limit(time=0.1, depth=15))
             score = info["score"].relative
+            is_mate_after = score.is_mate()
+            mate_in_after = score.mate() if is_mate_after else None
+            
             eval_relative = score.score(mate_score=10000) / 100.0 if score.score(mate_score=10000) is not None else None
             # Convert to white's perspective: board.turn now indicates the next side to move (opponent)
             eval_after = to_white_perspective(eval_relative, board.turn)
+            
+            if mate_in_after is not None:
+                mate_in_after = mate_in_after if board.turn else -mate_in_after
             
             # Calculate delta (from player's perspective)
             delta = None
@@ -537,10 +579,14 @@ def analyze_pgn_endpoint(request: AnalyzeRequest):
                 "delta": delta,
                 "label": label,
                 "best_move": best_move_data,
+                "is_mate": is_mate_after,
+                "mate_in": mate_in_after,
             })
             
             # Update for next iteration
             eval_before = eval_after
+            is_mate_before = is_mate_after
+            mate_in_before = mate_in_after
         
         return moves_analysis
     finally:
