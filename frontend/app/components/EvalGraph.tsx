@@ -90,9 +90,16 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
   };
 
   // Custom label component to render classification icons
-  const CustomIconLabel = (props: any) => {
+  interface CustomIconLabelProps {
+    viewBox?: { x: number; y: number; width?: number; height?: number };
+    classification?: string;
+  }
+  
+  const CustomIconLabel = (props: CustomIconLabelProps) => {
     const { viewBox, classification } = props;
-    if (!classification || !viewBox) return null;
+    if (!classification || !viewBox || typeof viewBox.x !== 'number' || typeof viewBox.y !== 'number') {
+      return null;
+    }
     
     // Icon size
     const iconSize = 20;
