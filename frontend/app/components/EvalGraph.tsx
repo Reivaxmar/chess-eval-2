@@ -119,8 +119,9 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
             label={{ value: 'Evaluation (White bottom, Black top)', angle: -90, position: 'insideLeft' }}
             tickFormatter={(value) => {
               // Show mate notation for extreme values
-              if (value >= 10) return 'M (B)';
-              if (value <= -10) return 'M (W)';
+              // Positive values at bottom = white winning, negative at top = black winning
+              if (value >= 10) return 'M (W)';
+              if (value <= -10) return 'M (B)';
               return value.toFixed(1);
             }}
           />
