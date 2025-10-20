@@ -476,15 +476,37 @@ def get_games_simple(username: str):
     return pgn_list
 
 @app.get("/api/games/{username}")
-def get_games(username: str):
-    """Fetch list of recent games for a Chess.com user."""
+def get_games(username: str, offset: int = 0, limit: int = 20):
+    """Fetch list of recent games for a Chess.com user.
+    
+    Args:
+        username: Chess.com username
+        offset: Number of games to skip (default: 0)
+        limit: Maximum number of games to return (default: 20, max: 100)
+    
+    Returns:
+        Dictionary with 'games' list and 'has_more' boolean
+    """
+    # Limit the max number of games per request
+    limit = min(limit, 100)
+    
     games = fetch_chess_com_games(username)
+    
+    # Reverse to get latest games first
+    games_reversed = list(reversed(games))
+    
+    # Calculate slice indices
+    start_idx = offset
+    end_idx = offset + limit
+    
+    # Get the requested slice
+    games_slice = games_reversed[start_idx:end_idx]
     
     # Return simplified game list
     game_list = []
-    for i, game in enumerate(games[:20]):  # Limit to 20 most recent games
+    for i, game in enumerate(games_slice):
         game_list.append({
-            "index": i,
+            "index": start_idx + i,  # Use the actual index in the full list
             "white": game.get("white", {}).get("username", "Unknown"),
             "black": game.get("black", {}).get("username", "Unknown"),
             "result": game.get("white", {}).get("result", "unknown"),
@@ -492,7 +514,16 @@ def get_games(username: str):
             "url": game.get("url", ""),
         })
     
-    return {"games": game_list}
+    # Check if there are more games available
+    has_more = end_idx < len(games_reversed)
+    
+    return {
+        "games": game_list,
+        "has_more": has_more,
+        "total": len(games_reversed),
+        "offset": offset,
+        "limit": limit
+    }
 
 @app.post("/analyze")
 def analyze_pgn_endpoint(request: AnalyzeRequest):
@@ -601,13 +632,19 @@ def analyze_pgn_endpoint(request: AnalyzeRequest):
 
 @app.post("/api/analyze")
 def analyze_game_endpoint(request: GameRequest):
-    """Analyze a specific game from Chess.com."""
+    """Analyze a specific game from Chess.com.
+    
+    The game_index refers to the position in the reversed (latest-first) list.
+    """
     games = fetch_chess_com_games(request.username)
     
-    if request.game_index >= len(games):
+    # Reverse to get latest games first (matching the /api/games endpoint)
+    games_reversed = list(reversed(games))
+    
+    if request.game_index >= len(games_reversed):
         raise HTTPException(status_code=404, detail="Game not found")
     
-    game = games[request.game_index]
+    game = games_reversed[request.game_index]
     pgn = game.get("pgn")
     
     if not pgn:
