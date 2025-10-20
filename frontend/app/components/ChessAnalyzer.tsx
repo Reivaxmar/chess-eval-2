@@ -63,6 +63,8 @@ export default function ChessAnalyzer() {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
   const [boardPosition, setBoardPosition] = useState('start');
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     if (!analysis || currentMoveIndex < 0) {
@@ -82,14 +84,39 @@ export default function ChessAnalyzer() {
     setError('');
     setGames([]);
     setAnalysis(null);
+    setHasMore(false);
 
     try {
-      const response = await axios.get(`${API_BASE}/api/games/${username}`);
+      const response = await axios.get(`${API_BASE}/api/games/${username}`, {
+        params: { offset: 0, limit: 20 }
+      });
       setGames(response.data.games);
+      setHasMore(response.data.has_more);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch games');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMoreGames = async () => {
+    if (!username.trim() || loadingMore || !hasMore) {
+      return;
+    }
+
+    setLoadingMore(true);
+    setError('');
+
+    try {
+      const response = await axios.get(`${API_BASE}/api/games/${username}`, {
+        params: { offset: games.length, limit: 20 }
+      });
+      setGames([...games, ...response.data.games]);
+      setHasMore(response.data.has_more);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load more games');
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -197,6 +224,19 @@ export default function ChessAnalyzer() {
                 </motion.div>
               ))}
             </div>
+            
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="mt-4 text-center">
+                <button
+                  onClick={loadMoreGames}
+                  disabled={loadingMore}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  {loadingMore ? 'Loading...' : 'Load More Games'}
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
 
