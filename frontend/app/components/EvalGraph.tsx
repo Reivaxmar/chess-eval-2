@@ -2,6 +2,7 @@
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea, ReferenceDot } from 'recharts';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 
 interface MoveData {
   move_number: number;
@@ -30,16 +31,20 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
       displayEval = move.mate_in_after > 0 ? 10 : -10;
     }
     
+    // Determine if this is a white or black move (even index = white, odd = black)
+    const isWhiteMove = idx % 2 === 0;
+    const displayMoveNumber = isWhiteMove ? `${move.move_number}.` : `${move.move_number}...`;
+    
     return {
+      moveIndex: idx, // Use index as the primary key for x-axis
       moveNumber: move.move_number,
       evaluation: displayEval,
-      name: `${move.move_number}. ${move.move}`,
+      name: `${displayMoveNumber} ${move.move}`,
       isCurrentMove: idx === currentMoveIndex,
       isBadMove: isBadMove,
       classification: move.classification,
       isMate: move.is_mate_after ?? false,
       mateIn: move.mate_in_after ?? null,
-      moveIndex: idx,
     };
   });
 
@@ -84,6 +89,37 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
     return null;
   };
 
+  // Custom label component to render classification icons
+  interface CustomIconLabelProps {
+    viewBox?: { x: number; y: number; width?: number; height?: number };
+    classification?: string;
+  }
+  
+  const CustomIconLabel = (props: CustomIconLabelProps) => {
+    const { viewBox, classification } = props;
+    if (!classification || !viewBox || typeof viewBox.x !== 'number' || typeof viewBox.y !== 'number') {
+      return null;
+    }
+    
+    // Icon size
+    const iconSize = 20;
+    const { x, y } = viewBox;
+    
+    return (
+      <foreignObject x={x - iconSize / 2} y={y - iconSize - 10} width={iconSize} height={iconSize}>
+        <div style={{ width: iconSize, height: iconSize }}>
+          <Image 
+            src={`/icons/${classification}.png`}
+            alt={classification}
+            width={iconSize}
+            height={iconSize}
+            style={{ objectFit: 'contain' }}
+          />
+        </div>
+      </foreignObject>
+    );
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -97,12 +133,10 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
           data={chartData}
           onClick={(data: any) => {
             if (data && data.activeLabel !== undefined) {
-              // activeLabel contains the moveNumber (x-axis value)
-              // Find the corresponding move index
-              const moveNumber = data.activeLabel;
-              const idx = chartData.findIndex(d => d.moveNumber === moveNumber);
-              if (onMoveClick && idx !== -1) {
-                onMoveClick(idx);
+              // activeLabel contains the moveIndex (x-axis value)
+              const moveIndex = data.activeLabel;
+              if (onMoveClick && moveIndex !== undefined && moveIndex >= 0 && moveIndex < moves.length) {
+                onMoveClick(moveIndex);
               }
             }
           }}
@@ -110,8 +144,17 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis 
-            dataKey="moveNumber" 
-            label={{ value: 'Move Number', position: 'insideBottom', offset: -5 }}
+            dataKey="moveIndex"
+            label={{ value: 'Move Index', position: 'insideBottom', offset: -5 }}
+            tickFormatter={(value) => {
+              // Show move number with white/black indicator
+              const data = chartData[value];
+              if (data) {
+                const isWhite = value % 2 === 0;
+                return isWhite ? `${data.moveNumber}` : `${data.moveNumber}...`;
+              }
+              return value;
+            }}
           />
           <YAxis 
             // Invert the domain so that positive (white advantage) is at bottom
@@ -128,7 +171,7 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
           <Tooltip content={<CustomTooltip />} />
           <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />
           
-          {/* Mark bad moves with reference dots on top of the graph */}
+          {/* Mark bad moves with reference dots and icons on top of the graph */}
           {chartData.map((data, idx) => {
             if (data.isBadMove && data.evaluation !== null) {
               const color = 
@@ -138,19 +181,13 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
               return (
                 <ReferenceDot
                   key={`bad-move-${idx}`}
-                  x={data.moveNumber}
+                  x={data.moveIndex}
                   y={data.evaluation}
                   r={5}
                   fill={color}
                   stroke="#fff"
                   strokeWidth={2}
-                  label={{
-                    value: data.classification === 'Blunder' ? '!!' : '!',
-                    position: 'top',
-                    fill: color,
-                    fontSize: 14,
-                    fontWeight: 'bold'
-                  }}
+                  label={<CustomIconLabel classification={data.classification} />}
                 />
               );
             }
