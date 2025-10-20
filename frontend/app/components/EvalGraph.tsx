@@ -91,11 +91,12 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
 
   // Custom label component to render classification icons
   const CustomIconLabel = (props: any) => {
-    const { x, y, classification } = props;
-    if (!classification) return null;
+    const { viewBox, classification } = props;
+    if (!classification || !viewBox) return null;
     
     // Icon size
     const iconSize = 20;
+    const { x, y } = viewBox;
     
     return (
       <foreignObject x={x - iconSize / 2} y={y - iconSize - 10} width={iconSize} height={iconSize}>
