@@ -100,7 +100,7 @@ export default function ChessAnalyzer() {
   };
 
   const loadMoreGames = async () => {
-    if (!username.trim() || loadingMore) {
+    if (!username.trim() || loadingMore || !hasMore) {
       return;
     }
 
