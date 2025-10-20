@@ -25,6 +25,10 @@ interface MoveAnalysis {
   win_percent_before?: number | null;
   win_percent_after?: number | null;
   accuracy?: number | null;
+  is_mate_before?: boolean | null;
+  is_mate_after?: boolean | null;
+  mate_in_before?: number | null;
+  mate_in_after?: number | null;
 }
 
 interface GameAnalysis {
@@ -241,6 +245,16 @@ export default function ChessAnalyzer() {
                       ? analysis.moves[currentMoveIndex].eval_after
                       : null
                   }
+                  isMate={
+                    currentMoveIndex >= 0 && analysis.moves[currentMoveIndex]
+                      ? analysis.moves[currentMoveIndex].is_mate_after ?? false
+                      : false
+                  }
+                  mateInMoves={
+                    currentMoveIndex >= 0 && analysis.moves[currentMoveIndex]
+                      ? analysis.moves[currentMoveIndex].mate_in_after ?? undefined
+                      : undefined
+                  }
                   onPositionChange={(fen: string) => {
                     // Update the controlled board position when a legal move is made on the board
                     setBoardPosition(fen);
@@ -302,7 +316,11 @@ export default function ChessAnalyzer() {
 
             {/* Right Column: Evaluation Graph and Move Info */}
             <div className="space-y-6">
-              <EvalGraph moves={analysis.moves} currentMoveIndex={currentMoveIndex} />
+              <EvalGraph 
+                moves={analysis.moves} 
+                currentMoveIndex={currentMoveIndex}
+                onMoveClick={(idx) => setCurrentMoveIndex(idx)}
+              />
               <MoveInfo
                 moves={analysis.moves}
                 currentMoveIndex={currentMoveIndex}
