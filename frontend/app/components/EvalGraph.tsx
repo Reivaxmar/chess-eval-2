@@ -1,6 +1,6 @@
 'use client';
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea, ReferenceDot } from 'recharts';
+import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot } from 'recharts';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 
@@ -105,8 +105,9 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
     const iconSize = 20;
     const { x, y } = viewBox;
     
+    // Center the icon on the data point (no y elevation)
     return (
-      <foreignObject x={x - iconSize / 2} y={y - iconSize - 10} width={iconSize} height={iconSize}>
+      <foreignObject x={x - iconSize / 2} y={y - iconSize / 2} width={iconSize} height={iconSize}>
         <div style={{ width: iconSize, height: iconSize }}>
           <Image 
             src={`/icons/${classification}.png`}
@@ -129,7 +130,7 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
     >
       <h3 className="text-xl font-semibold mb-4 text-gray-900">Evaluation Chart</h3>
       <ResponsiveContainer width="100%" height={300}>
-        <LineChart 
+        <ComposedChart 
           data={chartData}
           onClick={(data: any) => {
             if (data && data.activeLabel !== undefined) {
@@ -141,13 +142,20 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
             }
           }}
           style={{ cursor: 'pointer' }}
-          margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+          margin={{ top: 20, right: 5, left: 5, bottom: 5 }}
         >
-          {/* Paint area above 0 (black advantage) black - render first so it's in the background */}
-          <ReferenceArea y1={-domainLimit} y2={0} fill="#000000" fillOpacity={1} ifOverflow="extendDomain" />
-          
-          {/* Paint area below 0 (white advantage) white - render first so it's in the background */}
-          <ReferenceArea y1={0} y2={domainLimit} fill="#FFFFFF" fillOpacity={1} ifOverflow="extendDomain" />
+          <defs>
+            {/* Gradient for area under the line (white) */}
+            <linearGradient id="whiteArea" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#FFFFFF" stopOpacity={1} />
+              <stop offset="100%" stopColor="#FFFFFF" stopOpacity={1} />
+            </linearGradient>
+            {/* Gradient for area above the line (black) */}
+            <linearGradient id="blackArea" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#000000" stopOpacity={1} />
+              <stop offset="100%" stopColor="#000000" stopOpacity={1} />
+            </linearGradient>
+          </defs>
           
           <CartesianGrid strokeDasharray="3 3" stroke="#999" />
           <XAxis 
@@ -178,6 +186,28 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
           <Tooltip content={<CustomTooltip />} />
           
           <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />
+          
+          {/* Area under the line (white fill) - from line to bottom of chart */}
+          <Area 
+            type="monotone" 
+            dataKey="evaluation" 
+            stroke="none"
+            fill="url(#whiteArea)"
+            fillOpacity={1}
+            isAnimationActive={false}
+            baseLine={domainLimit}
+          />
+          
+          {/* Area above the line (black fill) - from line to top of chart */}
+          <Area 
+            type="monotone" 
+            dataKey="evaluation" 
+            stroke="none"
+            fill="url(#blackArea)"
+            fillOpacity={1}
+            isAnimationActive={false}
+            baseLine={-domainLimit}
+          />
           
           <Line 
             type="monotone" 
@@ -234,7 +264,7 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
             }
             return null;
           })}
-        </LineChart>
+        </ComposedChart>
       </ResponsiveContainer>
     </motion.div>
   );
