@@ -141,8 +141,15 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
             }
           }}
           style={{ cursor: 'pointer' }}
+          margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
         >
-          <CartesianGrid strokeDasharray="3 3" />
+          {/* Paint area above 0 (black advantage) black - render first so it's in the background */}
+          <ReferenceArea y1={-domainLimit} y2={0} fill="#000000" fillOpacity={1} ifOverflow="extendDomain" />
+          
+          {/* Paint area below 0 (white advantage) white - render first so it's in the background */}
+          <ReferenceArea y1={0} y2={domainLimit} fill="#FFFFFF" fillOpacity={1} ifOverflow="extendDomain" />
+          
+          <CartesianGrid strokeDasharray="3 3" stroke="#999" />
           <XAxis 
             dataKey="moveIndex"
             label={{ value: 'Move Index', position: 'insideBottom', offset: -5 }}
@@ -169,30 +176,8 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
             }}
           />
           <Tooltip content={<CustomTooltip />} />
-          <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />
           
-          {/* Mark bad moves with reference dots and icons on top of the graph */}
-          {chartData.map((data, idx) => {
-            if (data.isBadMove && data.evaluation !== null) {
-              const color = 
-                data.classification === 'Inaccuracy' ? '#eab308' :
-                data.classification === 'Mistake' ? '#f97316' : '#ef4444';
-              
-              return (
-                <ReferenceDot
-                  key={`bad-move-${idx}`}
-                  x={data.moveIndex}
-                  y={data.evaluation}
-                  r={5}
-                  fill={color}
-                  stroke="#fff"
-                  strokeWidth={2}
-                  label={<CustomIconLabel classification={data.classification} />}
-                />
-              );
-            }
-            return null;
-          })}
+          <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />
           
           <Line 
             type="monotone" 
@@ -226,6 +211,29 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
               );
             }}
           />
+          
+          {/* Mark bad moves with reference dots and icons on top of the graph - render last so they appear on top */}
+          {chartData.map((data, idx) => {
+            if (data.isBadMove && data.evaluation !== null) {
+              const color = 
+                data.classification === 'Inaccuracy' ? '#eab308' :
+                data.classification === 'Mistake' ? '#f97316' : '#ef4444';
+              
+              return (
+                <ReferenceDot
+                  key={`bad-move-${idx}`}
+                  x={data.moveIndex}
+                  y={data.evaluation}
+                  r={5}
+                  fill={color}
+                  stroke="#fff"
+                  strokeWidth={2}
+                  label={<CustomIconLabel classification={data.classification} />}
+                />
+              );
+            }
+            return null;
+          })}
         </LineChart>
       </ResponsiveContainer>
     </motion.div>
