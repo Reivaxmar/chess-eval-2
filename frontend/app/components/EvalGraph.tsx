@@ -195,7 +195,7 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
             fill="url(#whiteArea)"
             fillOpacity={1}
             isAnimationActive={false}
-            baseLine={domainLimit}
+            baseLine={-domainLimit}
           />
           
           {/* Area above the line (black fill) - from line to top of chart */}
@@ -206,7 +206,7 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
             fill="url(#blackArea)"
             fillOpacity={1}
             isAnimationActive={false}
-            baseLine={-domainLimit}
+            baseLine={domainLimit}
           />
           
           <Line 
