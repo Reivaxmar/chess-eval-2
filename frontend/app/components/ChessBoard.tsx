@@ -176,12 +176,12 @@ export default function ChessBoard({ position, currentMove, onPositionChange, ev
         {currentMove && currentMove.to && currentMove.classification && boardWidth > 0 && (() => {
           // map classification to an icon filename. Put your PNGs in `frontend/public/icons/`
           const map: Record<string, string> = {
-            best: 'best.png',
-            excellent: 'excellent.png',
-            good: 'good.png',
-            inaccuracy: 'inaccuracy.png',
-            mistake: 'mistake.png',
-            blunder: 'blunder.png',
+            best: 'Best.png',
+            excellent: 'Excellent.png',
+            good: 'Good.png',
+            inaccuracy: 'Inaccuracy.png',
+            mistake: 'Mistake.png',
+            blunder: 'Blunder.png',
           };
 
           const clsKey = String(currentMove.classification).toLowerCase();

@@ -12,9 +12,17 @@ from pathlib import Path
 app = FastAPI(title="Chess.com Game Analyzer")
 
 # Enable CORS for frontend
+# Configure CORS. For Codespaces you'll typically set ALLOW_ORIGINS to the forwarded frontend URL(s).
+allow_origins_env = os.environ.get("ALLOW_ORIGINS", "*")
+if allow_origins_env == "*":
+    allow_origins = ["*"]
+else:
+    # Split on commas and strip whitespace
+    allow_origins = [o.strip() for o in allow_origins_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
