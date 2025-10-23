@@ -26,11 +26,15 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
   const [tooltipData, setTooltipData] = useState<{ x: number; y: number; data: any } | null>(null);
 
   const chartData = moves.map((move, idx) => {
-    const isBadMove = ['Inaccuracy', 'Mistake', 'Blunder'].includes(move.classification);
+    const isBadMove = ['Inaccuracy', 'Mistake', 'Blunder', 'Miss'].includes(move.classification);
     
     let displayEval = move.eval_after;
     if (move.is_mate_after && move.mate_in_after !== null && move.mate_in_after !== undefined) {
-      displayEval = move.mate_in_after > 0 ? 10 : -10;
+      // Use a large value for mate, but keep the sign
+      displayEval = move.mate_in_after > 0 ? 100 : -100;
+    } else if (displayEval !== null) {
+      // Clamp extreme evaluations to ±10 to keep them on the graph
+      displayEval = Math.max(-10, Math.min(10, displayEval));
     }
     
     const isWhiteMove = idx % 2 === 0;
@@ -40,6 +44,7 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
       moveIndex: idx,
       moveNumber: move.move_number,
       evaluation: displayEval,
+      rawEvaluation: move.eval_after, // Keep the raw value for tooltip
       name: `${displayMoveNumber} ${move.move}`,
       isCurrentMove: idx === currentMoveIndex,
       isBadMove: isBadMove,
@@ -48,16 +53,6 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
       mateIn: move.mate_in_after ?? null,
     };
   });
-
-  const evaluations = chartData
-    .map(d => d.evaluation)
-    .filter((e): e is number => e !== null);
-  
-  const maxAbsEval = evaluations.length > 0 
-    ? Math.max(...evaluations.map(e => Math.abs(e)))
-    : 10;
-  
-  const domainLimit = Math.min(Math.max(Math.ceil(maxAbsEval + 1), 3), 20);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -86,11 +81,28 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
 
     // Helper functions
     const getX = (index: number) => padding.left + (index / Math.max(chartData.length - 1, 1)) * chartWidth;
+    
+    // Non-linear transformation using tanh (same as EvalBar)
     const getY = (value: number) => {
-      // Map from [-domainLimit, domainLimit] to [padding.top, padding.top + chartHeight]
-      // Negative values (black advantage) at top, positive (white advantage) at bottom
-      const normalized = (domainLimit - value) / (2 * domainLimit);
-      return padding.top + normalized * chartHeight;
+      // For mate positions, show at the very top or bottom
+      if (Math.abs(value) >= 100) {
+        return value > 0 ? padding.top + chartHeight : padding.top;
+      }
+      
+      // Use tanh transformation for non-linear scaling (same as EvalBar)
+      // This maps eval to percentage, then to Y coordinate
+      // At eval = 0, we want 50% (middle)
+      // At eval = +3, we want ~80%
+      // At eval = -3, we want ~20%
+      const clampedEval = Math.max(-10, Math.min(10, value));
+      
+      // Sigmoid transformation: percentage = 50 + (50 * tanh(eval / 4))
+      const percentage = 50 + (50 * Math.tanh(clampedEval / 4));
+      
+      // Convert percentage to Y coordinate (inverted: white at bottom, black at top)
+      // percentage 100 = white winning = bottom of chart
+      // percentage 0 = black winning = top of chart
+      return padding.top + ((100 - percentage) / 100) * chartHeight;
     };
 
     // Draw white background for area under the line
@@ -203,7 +215,8 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
       if (data.isBadMove) {
         const color = 
           data.classification === 'Inaccuracy' ? '#eab308' :
-          data.classification === 'Mistake' ? '#f97316' : '#ef4444';
+          data.classification === 'Mistake' ? '#f97316' : 
+          data.classification === 'Miss' ? '#a855f7' : '#ef4444';
         
         ctx.fillStyle = color;
         ctx.strokeStyle = '#fff';
@@ -230,12 +243,19 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     
-    for (let i = 0; i <= 4; i++) {
-      const value = domainLimit - (i / 4) * (2 * domainLimit);
-      const y = padding.top + (i / 4) * chartHeight;
-      const label = value >= 10 ? 'M (W)' : value <= -10 ? 'M (B)' : value.toFixed(1);
+    // Draw labels at specific percentage points
+    const labels = [
+      { percent: 0, label: 'M (B)' },    // Top (black mate)
+      { percent: 25, label: '+3' },       // 75% white winning
+      { percent: 50, label: '0' },        // Equal
+      { percent: 75, label: '-3' },       // 75% black winning
+      { percent: 100, label: 'M (W)' },   // Bottom (white mate)
+    ];
+    
+    labels.forEach(({ percent, label }) => {
+      const y = padding.top + (percent / 100) * chartHeight;
       ctx.fillText(label, padding.left - 10, y);
-    }
+    });
 
     // Draw X-axis labels
     ctx.textAlign = 'center';
@@ -260,7 +280,7 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
     ctx.textAlign = 'center';
     ctx.fillText('Move Index', width / 2, height - 10);
 
-  }, [chartData, domainLimit, currentMoveIndex]);
+  }, [chartData, currentMoveIndex]);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -345,8 +365,16 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
           const chartHeight = 300 - padding.top - padding.bottom;
           
           const x = padding.left + (idx / Math.max(chartData.length - 1, 1)) * chartWidth;
-          const normalized = (domainLimit - data.evaluation) / (2 * domainLimit);
-          const y = padding.top + normalized * chartHeight;
+          
+          // Use the same non-linear transformation as in the canvas
+          let y;
+          if (Math.abs(data.evaluation) >= 100) {
+            y = data.evaluation > 0 ? padding.top + chartHeight : padding.top;
+          } else {
+            const clampedEval = Math.max(-10, Math.min(10, data.evaluation));
+            const percentage = 50 + (50 * Math.tanh(clampedEval / 4));
+            y = padding.top + ((100 - percentage) / 100) * chartHeight;
+          }
           
           const iconSize = 20;
           
@@ -389,15 +417,18 @@ export default function EvalGraph({ moves, currentMoveIndex, onMoveClick }: Eval
             <p className="text-sm text-gray-600">
               {tooltipData.data.isMate && tooltipData.data.mateIn !== null 
                 ? `M${Math.abs(tooltipData.data.mateIn)}` 
-                : `Eval: ${tooltipData.data.evaluation !== null ? tooltipData.data.evaluation.toFixed(2) : 'N/A'}`}
+                : tooltipData.data.rawEvaluation !== null && tooltipData.data.rawEvaluation !== undefined
+                  ? `Eval: ${tooltipData.data.rawEvaluation.toFixed(2)}`
+                  : `Eval: ${tooltipData.data.evaluation !== null ? tooltipData.data.evaluation.toFixed(2) : 'N/A'}`}
             </p>
             <p className="text-sm">
               <span className={
                 tooltipData.data.classification === 'Best' || tooltipData.data.classification === 'Excellent' ? 'text-green-600' :
-                tooltipData.data.classification === 'Good' ? 'text-blue-600' :
+                tooltipData.data.classification === 'Good' ? 'text-teal-700' :
                 tooltipData.data.classification === 'Inaccuracy' ? 'text-yellow-600' :
                 tooltipData.data.classification === 'Mistake' ? 'text-orange-600' :
-                tooltipData.data.classification === 'Blunder' ? 'text-red-600' : 'text-gray-600'
+                tooltipData.data.classification === 'Blunder' ? 'text-red-600' : 
+                tooltipData.data.classification === 'Miss' ? 'text-purple-600' : 'text-gray-600'
               }>
                 {tooltipData.data.classification}
               </span>

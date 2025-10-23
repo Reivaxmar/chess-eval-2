@@ -63,3 +63,4 @@ backend/stockfish*
 *.tmp
 tmp/
 .cache/
+screenshots/
