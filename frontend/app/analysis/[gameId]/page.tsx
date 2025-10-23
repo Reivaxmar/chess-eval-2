@@ -43,7 +43,9 @@ interface GameAnalysis {
   black_accuracy?: number | null;
 }
 
-const API_BASE = 'http://localhost:8000';
+// Use environment variable when available so Codespaces / forwarded URLs can be used.
+// In Next.js set NEXT_PUBLIC_API_BASE to the forwarded backend URL (e.g. https://8000-<hash>.githubpreview.dev)
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
 
 export default function AnalysisPage() {
   const params = useParams();
