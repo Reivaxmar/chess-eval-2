@@ -238,7 +238,8 @@ def fetch_chess_com_games(username: str):
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch games: {str(e)}")
 
-def classify_move(eval_before: Optional[float], eval_after: Optional[float], is_white_move: bool) -> str:
+def classify_move(eval_before: Optional[float], eval_after: Optional[float], is_white_move: bool, 
+                  is_mate_before: bool = False, is_mate_after: bool = False) -> str:
     """Classify move quality based on centipawn loss.
     
     Classification thresholds (centipawn loss):
@@ -248,6 +249,7 @@ def classify_move(eval_before: Optional[float], eval_after: Optional[float], is_
     - 150-300: Inaccuracy
     - 300-600: Mistake
     - >600: Blunder
+    - Missed mate: Miss
     """
     if eval_before is None or eval_after is None:
         return "Unknown"
@@ -258,9 +260,19 @@ def classify_move(eval_before: Optional[float], eval_after: Optional[float], is_
         # If we're delivering or maintaining mate, it's a best move
         if abs(eval_after) >= 100:
             return "Best"
-        # If we had mate but lost it, it's likely a blunder
+        # If we had mate but lost it, check if it's a miss or blunder
         if abs(eval_before) >= 100:
-            return "Blunder"
+            # Missed mate: went from mate to a good/reasonable position for the side that had mate
+            # Check the sign to see if the position is still favorable
+            eval_before_player = eval_before if is_white_move else -eval_before
+            eval_after_player = eval_after if is_white_move else -eval_after
+            
+            # If the eval is still positive (good for the player) after missing mate, it's a "Miss"
+            # If the eval became negative or near zero, it's a "Blunder"
+            if eval_after_player > 0.5:  # Still winning after missing mate
+                return "Miss"
+            else:
+                return "Blunder"
         return "Unknown"
     
     # Convert from white's perspective
@@ -381,7 +393,7 @@ def analyze_game(pgn_text: str):
                 mate_in_after = mate_in_after if board.turn else -mate_in_after
             
             # Classify the move
-            classification = classify_move(eval_before, eval_after, is_white_move)
+            classification = classify_move(eval_before, eval_after, is_white_move, is_mate_before, is_mate_after)
             
             # Calculate accuracy metrics
             win_percent_before = None
@@ -612,7 +624,7 @@ def analyze_pgn_endpoint(request: AnalyzeRequest):
                 delta = eval_after_player - eval_before_player
             
             # Classify the move
-            label = classify_move(eval_before, eval_after, is_white_move)
+            label = classify_move(eval_before, eval_after, is_white_move, is_mate_before, is_mate_after)
             
             # Only include best_move if the played move is not the best
             best_move_data = None

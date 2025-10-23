@@ -30,13 +30,15 @@ export default function MoveInfo({ moves, currentMoveIndex, onMoveClick, whiteAc
       case 'Excellent':
         return 'text-green-600 bg-green-50';
       case 'Good':
-        return 'text-blue-600 bg-blue-50';
+        return 'text-teal-700 bg-teal-50';
       case 'Inaccuracy':
         return 'text-yellow-600 bg-yellow-50';
       case 'Mistake':
         return 'text-orange-600 bg-orange-50';
       case 'Blunder':
         return 'text-red-600 bg-red-50';
+      case 'Miss':
+        return 'text-purple-600 bg-purple-50';
       default:
         return 'text-gray-600 bg-gray-50';
     }
@@ -51,6 +53,7 @@ export default function MoveInfo({ moves, currentMoveIndex, onMoveClick, whiteAc
       Inaccuracy: 0,
       Mistake: 0,
       Blunder: 0,
+      Miss: 0,
     };
 
     moves.forEach((move) => {
